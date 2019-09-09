@@ -1,0 +1,6 @@
+AppKey:
+  AccessKey: ak1234567abcdefg
+  SecretKey: sk1234567abcdefg
+Bucket:
+  Name: imagine-space
+  Domain:
