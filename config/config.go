@@ -1,11 +1,11 @@
-package main
+package config
 
 import (
-	"fmt"
 	"io/ioutil"
-	"log"
 
 	"gopkg.in/yaml.v2"
+
+	defineError "image2qiniu/errors"
 )
 
 // AppKey qiniu appkey
@@ -26,25 +26,24 @@ type AppConfig struct {
 	Bucket Bucket `yaml:"Bucket"`
 }
 
-func main() {
-	// user, err := user.Current()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+// LoadConfig load config from configPath
+func LoadConfig(configPath string) (*AppConfig, error) {
+	if configPath == "" {
+		return nil, nil
+	}
 
-	// fmt.Println(user.HomeDir)
 	var appConfig AppConfig
 
 	// Read config file
-	configFile, err := ioutil.ReadFile("./image4qiniu.yaml")
+	configFile, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		log.Fatal(err)
+		return nil, defineError.ErrOpenConfig
 	}
 
 	err = yaml.Unmarshal(configFile, &appConfig)
 	if err != nil {
-		log.Fatal(err)
+		return nil, defineError.ErrLoadConfig
 	}
 
-	fmt.Println(appConfig)
+	return &appConfig, nil
 }

@@ -1,35 +1,83 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
+	"log"
 	"net"
 	"net/http"
+	"os/user"
+	"path/filepath"
 
 	"context"
 
 	"github.com/qiniu/api.v7/auth/qbox"
 	"github.com/qiniu/api.v7/storage"
+	flag "github.com/spf13/pflag"
+
+	defineConfig "image2qiniu/config"
+	defineErrors "image2qiniu/errors"
+	"image2qiniu/utils"
 )
 
 var (
-	// accessKey = os.Getenv("QINIU_ACCESS_KEY")
-	// secretKey = os.Getenv("QINIU_SECRET_KEY")
-	// bucket    = os.Getenv("QINIU_TEST_BUCKET")
-	accessKey = "-hk4KJ9Ph_yIccAPqMwI39iyP__j4KvBYUJ3j7im"
-	secretKey = "cEUI_OFXlbj6TMCCujsqPVGPwKX6XLfdbBgh5kvR"
-	bucket    = "imagine-space"
+	link       string // image URI
+	image      string // local image path
+	download   string // download image. store to desktop
+	secretKey  string // upload sk
+	accessKey  string // upload sk
+	bucketName string // bucket for store image
+	keyPerfix  string // key perfix for store image
+	nameSuffix string // Add suffix to name
+	config     string // Config file path
 )
 
-func joinStrs(strs ...string) string {
-	var buf bytes.Buffer
-	for _, str := range strs {
-		buf.WriteString(str)
+// default config filePath on user home dir
+var defaultConfigFilePath = ".config/image4qiniu.yaml"
+
+func init() {
+	flag.StringVarP(&link, "link", "l", "", "image link on net")
+	flag.StringVarP(&image, "image", "i", "", "local image path")
+	flag.StringVarP(&download, "download", "D", "", "download image")
+
+	flag.StringVar(&secretKey, "sk", "", "Secret Key")
+	flag.StringVar(&secretKey, "ak", "", "Access key")
+	flag.StringVar(&bucketName, "bucketName", "", "image store bucket name")
+	flag.StringVar(&keyPerfix, "keyPrefix", "", "upload key prefix")
+	flag.StringVar(&nameSuffix, "nameSuffix", "", "add suffix to name")
+	flag.StringVar(&config, "config", "", "config file path")
+
+	flag.Parse()
+}
+
+// parse config
+func parseConfig() bool {
+	// download image and upload, should check AssessKey and SecretKey
+
+	if link == "" && image == "" && download == "" {
+		log.Fatal(defineErrors.ErrNoImageSpecify)
+		return false
 	}
-	return buf.String()
+
+	return true
 }
 
 func main() {
+	var appConfig *defineConfig.AppConfig
+	var err error
+
+	// Read user home dir .config/image4qiniu.yaml
+	if config == "" {
+		// Get home dir and config file path
+		user, _ := user.Current()
+		configFilePath := filepath.Join(user.HomeDir, defaultConfigFilePath)
+		// Load config
+		appConfig, err = defineConfig.LoadConfig(configFilePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+
+	}
 
 	// 本地需要上传的文件
 	localFile := "wallpaper.png"
@@ -38,7 +86,7 @@ func main() {
 
 	// 上传策略
 	putPolicy := storage.PutPolicy{
-		Scope: joinStrs(bucket, ":", key),
+		Scope: utils.JoinStrs(bucketName, ":", key),
 	}
 
 	// 认证消息
