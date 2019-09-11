@@ -17,8 +17,9 @@ type AppKey struct {
 
 // Bucket 需要上传的 Bucket 名字
 type Bucket struct {
-	Name  string `yaml:"Name"`
-	Domin string `yaml:"Domin"`
+	Name      string `yaml:"Name"`
+	Domin     string `yaml:"Domin"`
+	KeyPerfix string `yaml:"KeyPerfix"`
 }
 
 // AppConfig qiniu app

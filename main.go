@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"context"
 
@@ -18,6 +19,9 @@ import (
 	defineErrors "image2qiniu/errors"
 	"image2qiniu/utils"
 )
+
+// tmpImageStorePath temporary file store path
+const tmpImageStorePath = "/tmp/image2qiniu/"
 
 var (
 	link       string // image URI
@@ -88,7 +92,6 @@ func main() {
 		}
 	}
 
-
 	// command line args first
 	// checkout accessKey
 	if accessKey != "" {
@@ -116,6 +119,23 @@ func main() {
 		if appConfig.Bucket.Name == "" {
 			log.Fatal(defineErrors.ErrNoBucketName)
 			return
+		}
+	}
+
+	var fileName string
+	// Download and upload
+	if link != "" {
+		fileName = strings.SplitN(link, "/", 2)[1]
+		// key perfix
+		if keyPerfix != "" {
+			fileName = utils.JoinStrs(keyPerfix, fileName)
+		} else if appConfig.Bucket.KeyPerfix != "" {
+			fileName = utils.JoinStrs(appConfig.Bucket.KeyPerfix, fileName)
+		}
+
+		// name suffix
+		if nameSuffix != "" {
+			fileName = utils.JoinStrs(fileName, nameSuffix)
 		}
 	}
 
