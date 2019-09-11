@@ -2,10 +2,11 @@ package config
 
 import (
 	"io/ioutil"
+	"os"
 
 	"gopkg.in/yaml.v2"
 
-	defineError "image2qiniu/errors"
+	defineErrors "image2qiniu/errors"
 )
 
 // AppKey qiniu appkey
@@ -32,17 +33,22 @@ func LoadConfig(configPath string) (*AppConfig, error) {
 		return nil, nil
 	}
 
+	_, err := os.Stat(configPath)
+	if err != nil {
+		return nil, defineErrors.ErrConfigFileNotExits
+	}
+
 	var appConfig AppConfig
 
 	// Read config file
 	configFile, err := ioutil.ReadFile(configPath)
 	if err != nil {
-		return nil, defineError.ErrOpenConfig
+		return nil, defineErrors.ErrOpenConfig
 	}
 
 	err = yaml.Unmarshal(configFile, &appConfig)
 	if err != nil {
-		return nil, defineError.ErrLoadConfig
+		return nil, defineErrors.ErrLoadConfig
 	}
 
 	return &appConfig, nil

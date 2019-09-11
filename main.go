@@ -65,18 +65,45 @@ func main() {
 	var appConfig *defineConfig.AppConfig
 	var err error
 
+	// config file path
+	var configFilePath string
+
 	// Read user home dir .config/image4qiniu.yaml
 	if config == "" {
 		// Get home dir and config file path
 		user, _ := user.Current()
-		configFilePath := filepath.Join(user.HomeDir, defaultConfigFilePath)
-		// Load config
-		appConfig, err = defineConfig.LoadConfig(configFilePath)
-		if err != nil {
-			log.Fatal(err)
-		}
+		configFilePath = filepath.Join(user.HomeDir, defaultConfigFilePath)
 	} else {
+		// useSpecify Path
+		configFilePath = config
+	}
 
+	// Load config
+	appConfig, err = defineConfig.LoadConfig(configFilePath)
+	if err != nil {
+		// specify config file. but can't find it
+		if config != "" && err == defineErrors.ErrConfigFileNotExits {
+			log.Fatal(err)
+			return
+		}
+	}
+
+	// read config file. Need check ak, sk
+	if appConfig.AppKey.AccessKey == "" {
+		if accessKey != "" {
+			appConfig.AppKey.AccessKey = accessKey
+		} else {
+			log.Fatal(defineErrors.ErrNoAccessKey)
+			return
+		}
+	}
+	if appConfig.AppKey.SecretKey == "" {
+		if secretKey != "" {
+			appConfig.AppKey.SecretKey = secretKey
+		} else {
+			log.Fatal(defineErrors.ErrNoSecretKey)
+			return
+		}
 	}
 
 	// 本地需要上传的文件
@@ -133,7 +160,7 @@ func main() {
 		},
 	}
 	//putExtra.NoCrc32Check = true
-	err := formUploader.PutFile(context.Background(), &ret, upToken, key, localFile, &putExtra)
+	err = formUploader.PutFile(context.Background(), &ret, upToken, key, localFile, &putExtra)
 	if err != nil {
 		fmt.Println(err)
 		return
