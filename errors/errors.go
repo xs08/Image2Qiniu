@@ -15,7 +15,10 @@ var ErrLoadConfig = errors.New("Can't load config to AppConfig")
 var ErrNoImageSpecify = errors.New("image must specify")
 
 // ErrNoAccessKey no access key
-var ErrNoAccessKey = errors.New("no access key specify")
+var ErrNoAccessKey = errors.New("No access key specify")
 
 // ErrNoSecretKey no secret key
-var ErrNoSecretKey = errors.New("no secret key specify")
+var ErrNoSecretKey = errors.New("No secret key specify")
+
+// ErrNoBucketName no bucketName specify
+var ErrNoBucketName = errors.New("No bucket name specify")

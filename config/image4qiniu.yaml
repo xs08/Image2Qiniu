@@ -3,4 +3,4 @@ AppKey:
   SecretKey: sk1234567abcdefg
 Bucket:
   Name: imagine-space
-  Domain:
+  Domain: 

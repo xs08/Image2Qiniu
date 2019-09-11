@@ -88,20 +88,33 @@ func main() {
 		}
 	}
 
-	// read config file. Need check ak, sk
-	if appConfig.AppKey.AccessKey == "" {
-		if accessKey != "" {
-			appConfig.AppKey.AccessKey = accessKey
-		} else {
+
+	// command line args first
+	// checkout accessKey
+	if accessKey != "" {
+		appConfig.AppKey.AccessKey = accessKey
+	} else {
+		if appConfig.AppKey.AccessKey == "" {
 			log.Fatal(defineErrors.ErrNoAccessKey)
 			return
 		}
 	}
-	if appConfig.AppKey.SecretKey == "" {
-		if secretKey != "" {
-			appConfig.AppKey.SecretKey = secretKey
-		} else {
+	// checkout secretKey
+	if secretKey != "" {
+		appConfig.AppKey.SecretKey = secretKey
+	} else {
+		if appConfig.AppKey.SecretKey == "" {
 			log.Fatal(defineErrors.ErrNoSecretKey)
+			return
+		}
+	}
+
+	// checkout bucketName
+	if bucketName != "" {
+		appConfig.Bucket.Name = bucketName
+	} else {
+		if appConfig.Bucket.Name == "" {
+			log.Fatal(defineErrors.ErrNoBucketName)
 			return
 		}
 	}
