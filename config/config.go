@@ -31,7 +31,7 @@ type AppConfig struct {
 // LoadConfig load config from configPath
 func LoadConfig(configPath string) (*AppConfig, error) {
 	if configPath == "" {
-		return nil, nil
+		return nil, defineErrors.ErrConfigFileNotExits
 	}
 
 	_, err := os.Stat(configPath)

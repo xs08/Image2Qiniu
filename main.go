@@ -3,16 +3,10 @@ package main
 import (
 	"fmt"
 	"log"
-	"net"
-	"net/http"
 	"os/user"
 	"path/filepath"
 	"strings"
 
-	"context"
-
-	"github.com/qiniu/api.v7/auth/qbox"
-	"github.com/qiniu/api.v7/storage"
 	flag "github.com/spf13/pflag"
 
 	defineConfig "image2qiniu/config"
@@ -44,7 +38,7 @@ func init() {
 	flag.StringVarP(&download, "download", "D", "", "download image")
 
 	flag.StringVar(&secretKey, "sk", "", "Secret Key")
-	flag.StringVar(&secretKey, "ak", "", "Access key")
+	flag.StringVar(&accessKey, "ak", "", "Access key")
 	flag.StringVar(&bucketName, "bucketName", "", "image store bucket name")
 	flag.StringVar(&keyPerfix, "keyPrefix", "", "upload key prefix")
 	flag.StringVar(&nameSuffix, "nameSuffix", "", "add suffix to name")
@@ -83,15 +77,20 @@ func main() {
 	}
 
 	// Load config
-	appConfig, err = defineConfig.LoadConfig(configFilePath)
-	if err != nil {
-		// specify config file. but can't find it
-		if config != "" && err == defineErrors.ErrConfigFileNotExits {
-			log.Fatal(err)
-			return
+	if config != "" {
+		appConfig, err = defineConfig.LoadConfig(configFilePath)
+		if err != nil {
+			log.Print(err)
+			// specify config file. but can't find it
+			if err == defineErrors.ErrConfigFileNotExits {
+				log.Fatal(err)
+				return
+			}
 		}
+	} else {
+		// if config not exist, should initial appConfig
+		appConfig = &defineConfig.AppConfig{}
 	}
-
 	// command line args first
 	// checkout accessKey
 	if accessKey != "" {
@@ -139,65 +138,67 @@ func main() {
 		}
 	}
 
+	fmt.Println("fileName: ", fileName)
+
 	// 本地需要上传的文件
-	localFile := "wallpaper.png"
-	// 文件保存的key
-	key := "images/wallpaper2.png"
+	// localFile := "wallpaper.png"
+	// // 文件保存的key
+	// key := "images/wallpaper2.png"
 
-	// 上传策略
-	putPolicy := storage.PutPolicy{
-		Scope: utils.JoinStrs(bucketName, ":", key),
-	}
+	// // 上传策略
+	// putPolicy := storage.PutPolicy{
+	// 	Scope: utils.JoinStrs(bucketName, ":", key),
+	// }
 
-	// 认证消息
-	mac := qbox.NewMac(accessKey, secretKey)
-	// 策略与认证信息生成Token
-	upToken := putPolicy.UploadToken(mac)
+	// // 认证消息
+	// mac := qbox.NewMac(accessKey, secretKey)
+	// // 策略与认证信息生成Token
+	// upToken := putPolicy.UploadToken(mac)
 
-	// 存储配置
-	cfg := storage.Config{}
-	// 空间对应的机房
-	cfg.Zone = &storage.ZoneHuanan
-	// 是否使用https域名
-	cfg.UseHTTPS = false
-	// 上传是否使用CDN上传加速
-	cfg.UseCdnDomains = false
+	// // 存储配置
+	// cfg := storage.Config{}
+	// // 空间对应的机房
+	// cfg.Zone = &storage.ZoneHuanan
+	// // 是否使用https域名
+	// cfg.UseHTTPS = false
+	// // 上传是否使用CDN上传加速
+	// cfg.UseCdnDomains = false
 
-	//设置代理
-	// proxyURL := "http://localhost:8888"
-	// proxyURI, _ := url.Parse(proxyURL)
+	// //设置代理
+	// // proxyURL := "http://localhost:8888"
+	// // proxyURI, _ := url.Parse(proxyURL)
 
-	//绑定网卡
-	// nicIP := "192.168.0.110"
-	dialer := &net.Dialer{
-		// LocalAddr: &net.TCPAddr{
-		// 	IP: net.ParseIP(nicIP),
-		// },
-	}
+	// //绑定网卡
+	// // nicIP := "192.168.0.110"
+	// dialer := &net.Dialer{
+	// 	// LocalAddr: &net.TCPAddr{
+	// 	// 	IP: net.ParseIP(nicIP),
+	// 	// },
+	// }
 
-	//构建代理client对象
-	client := http.Client{
-		Transport: &http.Transport{
-			// Proxy: http.ProxyURL(proxyURI),
-			Dial: dialer.Dial,
-		},
-	}
+	// //构建代理client对象
+	// client := http.Client{
+	// 	Transport: &http.Transport{
+	// 		// Proxy: http.ProxyURL(proxyURI),
+	// 		Dial: dialer.Dial,
+	// 	},
+	// }
 
-	// 构建表单上传的对象
-	formUploader := storage.NewFormUploaderEx(&cfg, &storage.Client{Client: &client})
-	ret := storage.PutRet{}
-	// 可选配置
-	putExtra := storage.PutExtra{
-		Params: map[string]string{
-			"x:name": "wallpaper.png",
-		},
-	}
-	//putExtra.NoCrc32Check = true
-	err = formUploader.PutFile(context.Background(), &ret, upToken, key, localFile, &putExtra)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	fmt.Println(ret.Key, ret.Hash)
-	fmt.Printf("%v", ret)
+	// // 构建表单上传的对象
+	// formUploader := storage.NewFormUploaderEx(&cfg, &storage.Client{Client: &client})
+	// ret := storage.PutRet{}
+	// // 可选配置
+	// putExtra := storage.PutExtra{
+	// 	Params: map[string]string{
+	// 		"x:name": "wallpaper.png",
+	// 	},
+	// }
+	// //putExtra.NoCrc32Check = true
+	// err = formUploader.PutFile(context.Background(), &ret, upToken, key, localFile, &putExtra)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// fmt.Println(ret.Key, ret.Hash)
+	// fmt.Printf("%v", ret)
 }
