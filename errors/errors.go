@@ -22,3 +22,6 @@ var ErrNoSecretKey = errors.New("No secret key specify")
 
 // ErrNoBucketName no bucketName specify
 var ErrNoBucketName = errors.New("No bucket name specify")
+
+// ErrLinkIsNotOk link is uncorrent
+var ErrLinkIsNotOk = errors.New("link is uncorrent")

@@ -1,11 +1,22 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
+	"net"
+	"net/http"
+	"net/url"
+	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
 
+	"github.com/qiniu/api.v7/auth/qbox"
+	"github.com/qiniu/api.v7/storage"
 	flag "github.com/spf13/pflag"
 
 	defineConfig "image2qiniu/config"
@@ -15,6 +26,9 @@ import (
 
 // tmpImageStorePath temporary file store path
 const tmpImageStorePath = "/tmp/image2qiniu/"
+
+// default config filePath on user home dir
+const defaultConfigFilePath = ".config/image4qiniu.yaml"
 
 var (
 	link       string // image URI
@@ -28,9 +42,6 @@ var (
 	nameSuffix string // Add suffix to name
 	config     string // Config file path
 )
-
-// default config filePath on user home dir
-var defaultConfigFilePath = ".config/image4qiniu.yaml"
 
 func init() {
 	flag.StringVarP(&link, "link", "l", "", "image link on net")
@@ -58,6 +69,93 @@ func parseConfig() bool {
 	}
 
 	return true
+}
+
+// downloa tasks
+func startDownloakTasks(saveFilePath, link string, ok chan string) {
+	file, err := os.Create(saveFilePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	resp, err := http.Get(link)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	pix, err := ioutil.ReadAll(resp.Body)
+	_, err = io.Copy(file, bytes.NewReader(pix))
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ok <- saveFilePath
+}
+
+// upload task
+func startUpload(localFile string, ok chan struct{}) {
+	// 本地需要上传的文件
+	// 文件保存的key
+	key := "images/wallpaper2.png"
+
+	// 上传策略
+	putPolicy := storage.PutPolicy{
+		Scope: utils.JoinStrs(bucketName, ":", key),
+	}
+
+	// 认证消息
+	mac := qbox.NewMac(accessKey, secretKey)
+	// 策略与认证信息生成Token
+	upToken := putPolicy.UploadToken(mac)
+
+	// 存储配置
+	cfg := storage.Config{}
+	// 空间对应的机房
+	cfg.Zone = &storage.ZoneHuanan
+	// 是否使用https域名
+	cfg.UseHTTPS = false
+	// 上传是否使用CDN上传加速
+	cfg.UseCdnDomains = false
+
+	//设置代理
+	// proxyURL := "http://localhost:8888"
+	// proxyURI, _ := url.Parse(proxyURL)
+
+	//绑定网卡
+	// nicIP := "192.168.0.110"
+	dialer := &net.Dialer{
+		// LocalAddr: &net.TCPAddr{
+		// 	IP: net.ParseIP(nicIP),
+		// },
+	}
+
+	//构建代理client对象
+	client := http.Client{
+		Transport: &http.Transport{
+			// Proxy: http.ProxyURL(proxyURI),
+			Dial: dialer.Dial,
+		},
+	}
+
+	// 构建表单上传的对象
+	formUploader := storage.NewFormUploaderEx(&cfg, &storage.Client{Client: &client})
+	ret := storage.PutRet{}
+	// 可选配置
+	putExtra := storage.PutExtra{
+		Params: map[string]string{
+			"x:name": "wallpaper.png",
+		},
+	}
+	//putExtra.NoCrc32Check = true
+	err := formUploader.PutFile(context.Background(), &ret, upToken, key, localFile, &putExtra)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(ret.Key, ret.Hash)
+	fmt.Printf("%v", ret)
 }
 
 func main() {
@@ -122,92 +220,56 @@ func main() {
 		}
 	}
 
+	// fileName handler
 	var fileName string
 	if name != "" {
 		fileName = name
 	} else if link != "" {
+		_, err = url.Parse(link)
+		if err != nil {
+			log.Fatal(err)
+			log.Fatal(defineErrors.ErrLinkIsNotOk)
+			return
+		}
 		// Download and upload
 		// split link
 		temPathArr := strings.SplitAfter(link, "/")
 		// get last filename
 		fileName = temPathArr[len(temPathArr)-1]
-		// key perfix
-		if keyPerfix != "" {
-			fileName = utils.JoinStrs(keyPerfix, fileName)
-		} else if appConfig.Bucket.KeyPerfix != "" {
-			fileName = utils.JoinStrs(appConfig.Bucket.KeyPerfix, fileName)
-		}
-
-		// name suffix
-		if nameSuffix != "" {
-			fileName = utils.JoinStrs(fileName, nameSuffix)
-		}
 	}
 
 	if fileName == "" {
 		log.Fatal("file name not exists")
 		return
 	}
+	// Download file to saveFilePath
+	saveFilePath := filepath.Join(tmpImageStorePath, fileName)
 
-	// 本地需要上传的文件
-	// localFile := "wallpaper.png"
-	// // 文件保存的key
-	// key := "images/wallpaper2.png"
+	// key perfix
+	if keyPerfix != "" {
+		fileName = utils.JoinStrs(keyPerfix, fileName)
+	} else if appConfig.Bucket.KeyPerfix != "" {
+		fileName = utils.JoinStrs(appConfig.Bucket.KeyPerfix, fileName)
+	}
 
-	// // 上传策略
-	// putPolicy := storage.PutPolicy{
-	// 	Scope: utils.JoinStrs(bucketName, ":", key),
-	// }
+	// name suffix
+	if nameSuffix != "" {
+		fileName = utils.JoinStrs(fileName, nameSuffix)
+	}
 
-	// // 认证消息
-	// mac := qbox.NewMac(accessKey, secretKey)
-	// // 策略与认证信息生成Token
-	// upToken := putPolicy.UploadToken(mac)
+	downloadChan := make(chan string)
+	uploadChan := make(chan struct{})
 
-	// // 存储配置
-	// cfg := storage.Config{}
-	// // 空间对应的机房
-	// cfg.Zone = &storage.ZoneHuanan
-	// // 是否使用https域名
-	// cfg.UseHTTPS = false
-	// // 上传是否使用CDN上传加速
-	// cfg.UseCdnDomains = false
+	// Download file
+	go startDownloakTasks(saveFilePath, link, downloadChan)
 
-	// //设置代理
-	// // proxyURL := "http://localhost:8888"
-	// // proxyURI, _ := url.Parse(proxyURL)
-
-	// //绑定网卡
-	// // nicIP := "192.168.0.110"
-	// dialer := &net.Dialer{
-	// 	// LocalAddr: &net.TCPAddr{
-	// 	// 	IP: net.ParseIP(nicIP),
-	// 	// },
-	// }
-
-	// //构建代理client对象
-	// client := http.Client{
-	// 	Transport: &http.Transport{
-	// 		// Proxy: http.ProxyURL(proxyURI),
-	// 		Dial: dialer.Dial,
-	// 	},
-	// }
-
-	// // 构建表单上传的对象
-	// formUploader := storage.NewFormUploaderEx(&cfg, &storage.Client{Client: &client})
-	// ret := storage.PutRet{}
-	// // 可选配置
-	// putExtra := storage.PutExtra{
-	// 	Params: map[string]string{
-	// 		"x:name": "wallpaper.png",
-	// 	},
-	// }
-	// //putExtra.NoCrc32Check = true
-	// err = formUploader.PutFile(context.Background(), &ret, upToken, key, localFile, &putExtra)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-	// fmt.Println(ret.Key, ret.Hash)
-	// fmt.Printf("%v", ret)
+	for {
+		select {
+		// download ok, start upload
+		case storeFilePath := <-downloadChan:
+			go startUpload(storeFilePath, uploadChan)
+		case <-uploadChan:
+			fmt.Println("upload ok")
+		}
+	}
 }
