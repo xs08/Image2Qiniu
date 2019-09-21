@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os/user"
 	"path/filepath"
@@ -24,6 +23,7 @@ var (
 	secretKey  string // upload sk
 	accessKey  string // upload sk
 	bucketName string // bucket for store image
+	name       string // rename image
 	keyPerfix  string // key perfix for store image
 	nameSuffix string // Add suffix to name
 	config     string // Config file path
@@ -40,6 +40,7 @@ func init() {
 	flag.StringVar(&secretKey, "sk", "", "Secret Key")
 	flag.StringVar(&accessKey, "ak", "", "Access key")
 	flag.StringVar(&bucketName, "bucketName", "", "image store bucket name")
+	flag.StringVar(&name, "name", "", "rename image")
 	flag.StringVar(&keyPerfix, "keyPrefix", "", "upload key prefix")
 	flag.StringVar(&nameSuffix, "nameSuffix", "", "add suffix to name")
 	flag.StringVar(&config, "config", "", "config file path")
@@ -122,9 +123,14 @@ func main() {
 	}
 
 	var fileName string
-	// Download and upload
-	if link != "" {
-		fileName = strings.SplitN(link, "/", 2)[1]
+	if name != "" {
+		fileName = name
+	} else if link != "" {
+		// Download and upload
+		// split link
+		temPathArr := strings.SplitAfter(link, "/")
+		// get last filename
+		fileName = temPathArr[len(temPathArr)-1]
 		// key perfix
 		if keyPerfix != "" {
 			fileName = utils.JoinStrs(keyPerfix, fileName)
@@ -138,7 +144,10 @@ func main() {
 		}
 	}
 
-	fmt.Println("fileName: ", fileName)
+	if fileName == "" {
+		log.Fatal("file name not exists")
+		return
+	}
 
 	// 本地需要上传的文件
 	// localFile := "wallpaper.png"
