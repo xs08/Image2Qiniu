@@ -75,6 +75,7 @@ func parseConfig() bool {
 func startDownloakTasks(saveFilePath, link string, ok chan string) {
 	file, err := os.Create(saveFilePath)
 	if err != nil {
+		log.Println("Create file error")
 		log.Fatal(err)
 	}
 	defer file.Close()
@@ -95,14 +96,11 @@ func startDownloakTasks(saveFilePath, link string, ok chan string) {
 }
 
 // upload task
-func startUpload(localFile string, ok chan struct{}) {
-	// 本地需要上传的文件
-	// 文件保存的key
-	key := "images/wallpaper2.png"
+func startUpload(localFile, fileName, bucketName string, ok chan struct{}) {
 
 	// 上传策略
 	putPolicy := storage.PutPolicy{
-		Scope: utils.JoinStrs(bucketName, ":", key),
+		Scope: utils.JoinStrs(bucketName, ":", fileName),
 	}
 
 	// 认证消息
@@ -119,7 +117,7 @@ func startUpload(localFile string, ok chan struct{}) {
 	// 上传是否使用CDN上传加速
 	cfg.UseCdnDomains = false
 
-	//设置代理
+	// set proxy
 	// proxyURL := "http://localhost:8888"
 	// proxyURI, _ := url.Parse(proxyURL)
 
@@ -149,13 +147,16 @@ func startUpload(localFile string, ok chan struct{}) {
 		},
 	}
 	//putExtra.NoCrc32Check = true
-	err := formUploader.PutFile(context.Background(), &ret, upToken, key, localFile, &putExtra)
+	err := formUploader.PutFile(context.Background(), &ret, upToken, fileName, localFile, &putExtra)
+
 	if err != nil {
-		fmt.Println(err)
+		log.Println("Upload error")
+		log.Fatal(err)
 		return
 	}
 	fmt.Println(ret.Key, ret.Hash)
-	fmt.Printf("%v", ret)
+	fmt.Printf("%v\n", ret)
+	ok <- struct{}{}
 }
 
 func main() {
@@ -257,6 +258,11 @@ func main() {
 		fileName = utils.JoinStrs(fileName, nameSuffix)
 	}
 
+	// template folder for store image
+	if _, err = os.Stat(tmpImageStorePath); os.IsNotExist(err) {
+		os.Mkdir(tmpImageStorePath, os.ModePerm)
+	}
+
 	downloadChan := make(chan string)
 	uploadChan := make(chan struct{})
 
@@ -267,9 +273,11 @@ func main() {
 		select {
 		// download ok, start upload
 		case storeFilePath := <-downloadChan:
-			go startUpload(storeFilePath, uploadChan)
+			fmt.Println("Downloadok")
+			go startUpload(storeFilePath, fileName, bucketName, uploadChan)
 		case <-uploadChan:
-			fmt.Println("upload ok")
+			fmt.Println("upload success")
+			os.Exit(0)
 		}
 	}
 }
